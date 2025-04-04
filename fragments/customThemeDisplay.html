@@ -1,0 +1,33 @@
+<script type="text/javascript">
+    window.Liferay = window.Liferay || {};
+    window.Liferay.CustomThemeDisplay = window.Liferay.CustomThemeDisplay || {};
+
+    [#assign infoListDisplayObject = (request.getAttribute("INFO_ITEM"))! /]
+    [#if infoListDisplayObject?? && infoListDisplayObject.objectEntryId??]
+        window.Liferay.CustomThemeDisplay.getDisplayEntryId = function() {
+            return ${infoListDisplayObject.objectEntryId};
+        };
+    [#else]
+        window.Liferay.CustomThemeDisplay.getDisplayEntryId = function() {
+            return null;
+        };
+    [/#if]
+
+    [#assign commerceContext = (request.getAttribute("COMMERCE_CONTEXT"))! /]
+    [#if commerceContext??]
+        [#assign accountEntry = (commerceContext.getAccountEntry())! /]
+        [#if accountEntry??]
+            window.Liferay.CustomThemeDisplay.getAccountEntryId = function() {
+                return ${(accountEntry.getAccountEntryId())!};
+            };
+        [#else]
+            window.Liferay.CustomThemeDisplay.getAccountEntryId = function() {
+                return null;
+            };
+        [/#if]
+    [#else]
+        window.Liferay.CustomThemeDisplay.getAccountEntryId = function() {
+            return null;
+        };
+    [/#if]
+</script>

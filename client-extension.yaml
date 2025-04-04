@@ -1,0 +1,8 @@
+assemble:
+    - from: assets
+      hashify: global.js
+      into: static
+fetch-context-contributor-global-js:
+    name: Fetch context contributor Global JS
+    type: globalJS
+    url: global.*.js
