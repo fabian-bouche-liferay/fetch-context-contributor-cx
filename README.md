@@ -9,6 +9,7 @@ https://learn.liferay.com/w/dxp/liferay-development/data-sets/managing-data-sets
 However, this is limited to fixed values.
 
 This js client extension makes it possible to use dynamic values between curly braces.
+Enable it on pages where you want to use context aware Datasets.
 
 ## How does it work?
 
