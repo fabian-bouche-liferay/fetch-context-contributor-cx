@@ -91,7 +91,8 @@ window.fetch = async function (input, init = {}) {
       }
   
       console.warn(`[fetch override] Missing parameter for {${trimmedKey}}`);
-      throw new Error(`Missing parameter: ${trimmedKey}`);
+      //throw new Error(`Missing parameter: ${trimmedKey}`);
+      return `%7B${trimmedKey}%7D` 
     });
   
     let finalInit = { ...init };
@@ -113,7 +114,8 @@ window.fetch = async function (input, init = {}) {
         }
   
         console.warn(`[fetch override] Missing parameter for %${trimmedKey}%`);
-        throw new Error(`Missing parameter: ${trimmedKey}`);
+        //throw new Error(`Missing parameter: ${trimmedKey}`);
+        return `%25${trimmedKey}%25` 
       });
     }
   
