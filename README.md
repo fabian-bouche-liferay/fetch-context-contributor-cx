@@ -51,7 +51,7 @@ Bonus: there's some support for timezone offset.
 Some examples will make it easier to explain:
 
  - `{now}` is now
- - `{today}` is today, in your local timezone
+ - `{today}` is today, in your local timezone (midnight)
  - `{today +gmtoffsethours}` is today, GMT
  - `{now -1d}` is 24 hours ago
  - `{now -1h}` is 1 hours ago
