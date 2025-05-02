@@ -93,7 +93,7 @@ window.fetch = async function (input, init = {}) {
     let finalUrl = decodeURIComponent(originalUrl).replace(/{([^}]+)}/g, (_, key) => {
       const trimmedKey = key.trim();
   
-      if (trimmedKey.startsWith("now")) {
+      if (trimmedKey.startsWith("now") || trimmedKey.startsWith("today")) {
         const parsed = parseDateMath(trimmedKey);
         if (parsed) {
           console.log(`[fetch override] Substituted {${trimmedKey}} with`, parsed);
