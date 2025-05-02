@@ -27,19 +27,36 @@ const getLiferayContext = () => {
 };
 
 const parseDateMath = (str) => {
-  const trimmed = str.trim().toLowerCase();
+  const gmtOffsetMinutes = new Date().getTimezoneOffset(); // e.g., -120 for GMT+2
+  const gmtOffsetHours = -gmtOffsetMinutes / 60;
+
+  let trimmed = str.trim().toLowerCase();
+
+  // Extract whether +gmtOffsetHours or -gmtOffsetHours was used
+  const gmtOffsetMatch = trimmed.match(/([+-])\s*gmtoffsethours/);
+  let applyGmtOffset = 0;
+
+  if (gmtOffsetMatch) {
+    const gmtSign = gmtOffsetMatch[1] === '+' ? 1 : -1;
+    applyGmtOffset = gmtSign * gmtOffsetHours;
+    // Remove the "+gmtOffsetHours" from the string so we can parse the rest
+    trimmed = trimmed.replace(/[+-]\s*gmtoffsethours/i, '').trim();
+  }
 
   if (trimmed === 'now') {
-    return new Date().toISOString();
+    const date = new Date();
+    date.setHours(date.getHours() + applyGmtOffset);
+    return date.toISOString();
   }
 
   if (trimmed === 'today') {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    today.setHours(today.getHours() + applyGmtOffset);
     return today.toISOString();
   }
 
-  const match = str.match(/(now|today)\s*([+-])\s*(\d+)([dhm])/i);
+  const match = trimmed.match(/(now|today)\s*([+-])\s*(\d+)([dhm])/i);
   if (!match) return null;
 
   const [, base, sign, amountStr, unit] = match;
@@ -47,7 +64,7 @@ const parseDateMath = (str) => {
 
   let date = new Date();
   if (base.toLowerCase() === 'today') {
-    date.setHours(0, 0, 0, 0); // start of the day
+    date.setHours(0, 0, 0, 0);
   }
 
   switch (unit.toLowerCase()) {
@@ -61,6 +78,8 @@ const parseDateMath = (str) => {
       date.setMinutes(date.getMinutes() + amount);
       break;
   }
+
+  date.setHours(date.getHours() + applyGmtOffset);
 
   return date.toISOString();
 };
