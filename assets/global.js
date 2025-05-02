@@ -27,26 +27,42 @@ const getLiferayContext = () => {
 };
 
 const parseDateMath = (str) => {
-  const match = str.match(/now\s*([+-])\s*(\d+)([dhm])/i);
+  const trimmed = str.trim().toLowerCase();
+
+  if (trimmed === 'now') {
+    return new Date().toISOString();
+  }
+
+  if (trimmed === 'today') {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return today.toISOString();
+  }
+
+  const match = str.match(/(now|today)\s*([+-])\s*(\d+)([dhm])/i);
   if (!match) return null;
 
-  const [, sign, amountStr, unit] = match;
-  const amount = parseInt(amountStr) * (sign === '-' ? -1 : 1);
-  const now = new Date();
+  const [, base, sign, amountStr, unit] = match;
+  const amount = parseInt(amountStr, 10) * (sign === '-' ? -1 : 1);
 
-  switch (unit) {
+  let date = new Date();
+  if (base.toLowerCase() === 'today') {
+    date.setHours(0, 0, 0, 0); // start of the day
+  }
+
+  switch (unit.toLowerCase()) {
     case 'd':
-      now.setDate(now.getDate() + amount);
+      date.setDate(date.getDate() + amount);
       break;
     case 'h':
-      now.setHours(now.getHours() + amount);
+      date.setHours(date.getHours() + amount);
       break;
     case 'm':
-      now.setMinutes(now.getMinutes() + amount);
+      date.setMinutes(date.getMinutes() + amount);
       break;
   }
 
-  return now.toISOString();
+  return date.toISOString();
 };
 
 window.fetch = async function (input, init = {}) {
