@@ -44,20 +44,38 @@ jobs:
       - name: Prepare dist/
         run: |
           rm -rf dist && mkdir -p dist/latest
-          # Si tu as un dossier de sortie (ex: build/, dist/…), copie-le ici
+
+          # 1) Copier un éventuel build d'app (si présent)
           if [ -d build ]; then cp -R build/* dist/; fi
           if [ -d dist-app ]; then cp -R dist-app/* dist/; fi
 
-          # A minima : packager les fichiers utiles du repo
+          # 2) Zipper la client extension (assets + fragments + client-extension.yaml)
           zip -r dist/latest/fetch-context-contributor-cx.zip assets fragments client-extension.yaml 2>/dev/null || true
 
-          # Mini index HTML
+          # 3) Publier le global.js sous deux URLs:
+          #    - /latest/global.js  (pointeur "stable")
+          #    - /assets/global.js  (miroir à la racine des assets)
+          if [ -f assets/global.js ]; then
+            cp assets/global.js dist/latest/global.js
+            mkdir -p dist/assets
+            cp assets/global.js dist/assets/global.js
+          fi
+
+          # (optionnel) checksum pour vérifier l'intégrité
+          if command -v shasum >/dev/null 2>&1; then
+            (cd dist/latest && shasum -a 256 global.js fetch-context-contributor-cx.zip > SHA256SUMS.txt || true)
+          fi
+
+          # 4) Mini index HTML
           cat > dist/index.html <<'HTML'
           <!doctype html><meta charset="utf-8">
           <title>fetch-context-contributor-cx / latest</title>
           <h1>fetch-context-contributor-cx – latest</h1>
           <ul>
-            <li><a href="latest/fetch-context-contributor-cx.zip">ZIP installable</a></li>
+            <li><a href="latest/fetch-context-contributor-cx.zip">Client Extension (ZIP)</a></li>
+            <li><a href="latest/global.js">global.js (stable)</a></li>
+            <li><a href="assets/global.js">global.js (miroir /assets)</a></li>
+            <li><a href="latest/SHA256SUMS.txt">SHA256SUMS.txt</a></li>
           </ul>
           HTML
 
