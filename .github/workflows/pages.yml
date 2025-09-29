@@ -1,0 +1,78 @@
+name: Publish latest build to GitHub Pages
+
+on:
+  push:
+    branches: [ master ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        if: hashFiles('package.json') != ''
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install deps
+        if: hashFiles('package.json') != ''
+        run: |
+          if [ -f yarn.lock ]; then corepack enable && yarn install --frozen-lockfile; \
+          else npm ci; fi
+
+      - name: Build app
+        if: hashFiles('package.json') != ''
+        run: |
+          if [ -f package.json ]; then \
+            if npm run | grep -q " build"; then npm run build || yarn build; \
+            else echo "Pas de script build, on passera en mode copie."; fi; \
+          fi
+
+      - name: Prepare dist/
+        run: |
+          rm -rf dist && mkdir -p dist/latest
+          # Si tu as un dossier de sortie (ex: build/, dist/…), copie-le ici
+          if [ -d build ]; then cp -R build/* dist/; fi
+          if [ -d dist-app ]; then cp -R dist-app/* dist/; fi
+
+          # A minima : packager les fichiers utiles du repo
+          zip -r dist/latest/fetch-context-contributor-cx.zip assets fragments client-extension.yaml 2>/dev/null || true
+
+          # Mini index HTML
+          cat > dist/index.html <<'HTML'
+          <!doctype html><meta charset="utf-8">
+          <title>fetch-context-contributor-cx / latest</title>
+          <h1>fetch-context-contributor-cx – latest</h1>
+          <ul>
+            <li><a href="latest/fetch-context-contributor-cx.zip">ZIP installable</a></li>
+          </ul>
+          HTML
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
