@@ -36,14 +36,12 @@ if (!window.__fetchOverrideInstalled) {
 
     let trimmed = str.trim().toLowerCase();
 
-    // Extract whether +gmtOffsetHours or -gmtOffsetHours was used
     const gmtOffsetMatch = trimmed.match(/([+-])\s*gmtoffsethours/);
     let applyGmtOffset = 0;
 
     if (gmtOffsetMatch) {
       const gmtSign = gmtOffsetMatch[1] === '+' ? 1 : -1;
       applyGmtOffset = gmtSign * gmtOffsetHours;
-      // Remove the "+gmtOffsetHours" from the string so we can parse the rest
       trimmed = trimmed.replace(/[+-]\s*gmtoffsethours/i, '').trim();
     }
 
@@ -109,98 +107,112 @@ if (!window.__fetchOverrideInstalled) {
         console.error("[fetch override] Invalid input type for fetch");
         throw new Error("fetch() input must be a string, URL, or Request");
       }
-    
-      const allParams = {
-        ...getLiferayContext(),
-        ...(init.params || {})
-      };
-    
-      console.log("[fetch override] Params available for substitution:", allParams);
-    
-      let finalUrl = decodeURIComponent(originalUrl).replace(/{([^}]+)}/g, (_, key) => {
-        const trimmedKey = key.trim();
-    
-        if (trimmedKey.startsWith("now") || trimmedKey.startsWith("today")) {
-          const parsed = parseDateMath(trimmedKey);
-          if (parsed) {
-            console.log(`[fetch override] Substituted {${trimmedKey}} with`, parsed);
-            return encodeURIComponent(parsed);
-          }
-        }
-    
-        if (allParams.hasOwnProperty(trimmedKey)) {
-          console.log(`[fetch override] Substituted {${trimmedKey}} with`, allParams[trimmedKey]);
-          return encodeURIComponent(allParams[trimmedKey]);
-        }
-    
-        console.warn(`[fetch override] Missing parameter for {${trimmedKey}}`);
-        //throw new Error(`Missing parameter: ${trimmedKey}`);
-        return `%7B${trimmedKey}%7D` 
-      });
-    
-      let finalInit = { ...init };
-      if (typeof init.body === "string") {
-        finalInit.body = init.body.replace(/%([^%]+)%/g, (_, key) => {
+
+      if (new URL(originalUrl, window.location.origin).searchParams.get("liferaydds") === "true") {
+
+        const allParams = {
+          ...getLiferayContext(),
+          ...(init.params || {})
+        };
+      
+        console.log("[fetch override] Params available for substitution:", allParams);
+      
+        let finalUrl = decodeURIComponent(originalUrl).replace(/{([^}]+)}/g, (_, key) => {
           const trimmedKey = key.trim();
-    
-          if (trimmedKey.startsWith("now")) {
+      
+          if (trimmedKey.startsWith("now") || trimmedKey.startsWith("today")) {
             const parsed = parseDateMath(trimmedKey);
             if (parsed) {
-              console.log(`[fetch override] Substituted %${trimmedKey}% with`, parsed);
-              return parsed;
+              console.log(`[fetch override] Substituted {${trimmedKey}} with`, parsed);
+              return encodeURIComponent(parsed);
             }
           }
-    
+      
           if (allParams.hasOwnProperty(trimmedKey)) {
-            console.log(`[fetch override] Substituted %${trimmedKey}% with`, allParams[trimmedKey]);
-            return allParams[trimmedKey];
+            console.log(`[fetch override] Substituted {${trimmedKey}} with`, allParams[trimmedKey]);
+            return encodeURIComponent(allParams[trimmedKey]);
           }
-    
-          console.warn(`[fetch override] Missing parameter for %${trimmedKey}%`);
-          //throw new Error(`Missing parameter: ${trimmedKey}`);
-          return `%25${trimmedKey}%25` 
+      
+          console.warn(`[fetch override] Missing parameter for {${trimmedKey}}`);
+          return `%7B${trimmedKey}%7D` 
         });
-      }
-    
-      const { params, ...safeInit } = finalInit;
-    
-      console.log("[fetch override] Final URL:", finalUrl);
-      if (safeInit.body) console.log("[fetch override] Final body:", safeInit.body);
-    
-      if (init.headers) {
-        if (init.headers instanceof Headers) {
-          skipFetchEvent = init.headers.has("X-Skip-Fetch-Event");
-        } else if (typeof init.headers === "object") {
-          skipFetchEvent = !!init.headers["X-Skip-Fetch-Event"];
+      
+        let finalInit = { ...init };
+        if (typeof init.body === "string") {
+          finalInit.body = init.body.replace(/%([^%]+)%/g, (_, key) => {
+            const trimmedKey = key.trim();
+      
+            if (trimmedKey.startsWith("now")) {
+              const parsed = parseDateMath(trimmedKey);
+              if (parsed) {
+                console.log(`[fetch override] Substituted %${trimmedKey}% with`, parsed);
+                return parsed;
+              }
+            }
+      
+            if (allParams.hasOwnProperty(trimmedKey)) {
+              console.log(`[fetch override] Substituted %${trimmedKey}% with`, allParams[trimmedKey]);
+              return allParams[trimmedKey];
+            }
+      
+            console.warn(`[fetch override] Missing parameter for %${trimmedKey}%`);
+            return `%25${trimmedKey}%25` 
+          });
         }
-      }
+      
+        const { params, ...safeInit } = finalInit;
 
-      if(originalMethod === "GET" && !skipFetchEvent) {
+        // remove liferaydds=true parameter from query
         try {
           const urlObj = new URL(finalUrl, window.location.origin);
-          if (urlObj.pathname.startsWith("/o/")) {
-            window.Liferay.fire("fetch-context-contributor:request", finalUrl);
-            const queueKey = "fetchContextContributorQueue";
 
-            try {
-              const urlObj = new URL(finalUrl, window.location.origin);
-              const basePath = `${window.location.origin}/o${urlObj.pathname.split("/o")[1].split("/").slice(0, 3).join("/")}/`; // /o/{app}/{endpoint}/
-              const stored = JSON.parse(sessionStorage.getItem(queueKey)) || {};
+          urlObj.searchParams.delete("liferaydds");
 
-              stored[basePath] = finalUrl; // on garde uniquement la dernière requête par API
-
-              sessionStorage.setItem(queueKey, JSON.stringify(stored));
-            } catch (e) {
-              console.warn("[fetch override] Failed to queue per-API event URL:", e);
-            }
-
+          if (/^https?:\/\//i.test(finalUrl)) {
+            finalUrl = urlObj.toString();
+          } else {
+            finalUrl = urlObj.pathname + urlObj.search + urlObj.hash;
           }
         } catch (e) {
-          console.warn("[fetch override] Invalid URL, skipping event dispatch:", finalUrl, e);
+          console.warn("[fetch override] Failed to strip liferaydds param:", e);
         }
-      }
 
-      return originalFetch.call(this, finalUrl, safeInit);
+        console.log("[fetch override] Final URL:", finalUrl);
+        if (safeInit.body) console.log("[fetch override] Final body:", safeInit.body);
+
+        if(originalMethod === "GET") {
+          try {
+            const urlObj = new URL(finalUrl, window.location.origin);
+            if (urlObj.pathname.startsWith("/o/")) {
+              window.Liferay.fire("fetch-context-contributor:request", finalUrl);
+              const queueKey = "fetchContextContributorQueue";
+
+              try {
+                const urlObj = new URL(finalUrl, window.location.origin);
+                const basePath = `${window.location.origin}/o${urlObj.pathname.split("/o")[1].split("/").slice(0, 3).join("/")}/`;
+                const stored = JSON.parse(sessionStorage.getItem(queueKey)) || {};
+
+                stored[basePath] = finalUrl;
+
+                sessionStorage.setItem(queueKey, JSON.stringify(stored));
+              } catch (e) {
+                console.warn("[fetch override] Failed to queue per-API event URL:", e);
+              }
+
+            }
+          } catch (e) {
+            console.warn("[fetch override] Invalid URL, skipping event dispatch:", finalUrl, e);
+          }
+        }
+
+        return originalFetch.call(this, finalUrl, safeInit);
+
+      } else {
+
+        return originalFetch.call(this, input, init);
+
+      }
+    
     };
 
 }

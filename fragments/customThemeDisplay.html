@@ -1,33 +1,152 @@
-<script type="text/javascript">
+<script type="text/javascript" data-senna-track="temporary">
+  (function () {
     window.Liferay = window.Liferay || {};
     window.Liferay.CustomThemeDisplay = window.Liferay.CustomThemeDisplay || {};
+    const CTD = window.Liferay.CustomThemeDisplay;
 
+    // ----- util promisify -----
+    const promisifyService = (resource, payload) =>
+      new Promise((resolve, reject) => {
+        Liferay.Service(resource, payload, (obj) => {
+          if (obj && !obj.exception) resolve(obj);
+          else reject(obj?.exception || new Error(resource + ' failed'));
+        });
+      });
+
+    // ----- INFO_ITEM / entryId -----
     [#assign infoListDisplayObject = (request.getAttribute("INFO_ITEM"))! /]
     [#if infoListDisplayObject?? && infoListDisplayObject.objectEntryId??]
-        window.Liferay.CustomThemeDisplay.getDisplayEntryId = function() {
-            return ${infoListDisplayObject.objectEntryId};
-        };
+      CTD.getDisplayEntryId = function () { return ${infoListDisplayObject.objectEntryId}; };
     [#else]
-        window.Liferay.CustomThemeDisplay.getDisplayEntryId = function() {
-            return null;
-        };
+      CTD.getDisplayEntryId = function () { return null; };
     [/#if]
 
+    // ----- classNameId de l’item affiché -----
+    [#if request.getAttribute("INFO_ITEM_DETAILS")??]
+      let _displayClassNameIdPromise;
+      CTD.getDisplayEntryClassNameId = async function () {
+        if (!_displayClassNameIdPromise) {
+          const className = '${request.getAttribute("INFO_ITEM_DETAILS").getInfoItemClassDetails().getClassName()?js_string}';
+          _displayClassNameIdPromise = promisifyService('/classname/fetch-class-name', { value: className })
+            .then(r => r.classNameId);
+        }
+        return _displayClassNameIdPromise;
+      };
+    [/#if]
+
+    // ----- Account -----
     [#assign commerceContext = (request.getAttribute("COMMERCE_CONTEXT"))! /]
     [#if commerceContext??]
-        [#assign accountEntry = (commerceContext.getAccountEntry())! /]
-        [#if accountEntry??]
-            window.Liferay.CustomThemeDisplay.getAccountEntryId = function() {
-                return ${(accountEntry.getAccountEntryId())!};
-            };
-        [#else]
-            window.Liferay.CustomThemeDisplay.getAccountEntryId = function() {
-                return null;
-            };
-        [/#if]
+      [#assign accountEntry = (commerceContext.getAccountEntry())! /]
+      [#if accountEntry??]
+        CTD.getAccountId = function () { return ${(accountEntry.getAccountEntryId())!}; };
+      [#else]
+        CTD.getAccountId = function () { return null; };
+      [/#if]
     [#else]
-        window.Liferay.CustomThemeDisplay.getAccountEntryId = function() {
-            return null;
-        };
+      CTD.getAccountId = function () { return null; };
     [/#if]
+
+    // ========= Cache =========
+    let _defsLoaded = false;
+    let _defsPromise = null;
+
+    // ERC -> { className, classNameId?, objectDefinitionId, erc }
+    const _ercMap = Object.create(null);
+    // className (pleinement qualifié) -> classNameId
+    const _classNameIdByName = Object.create(null);
+    // anti-rebond pour fetch-class-name par className
+    const _classNameIdPromises = Object.create(null);
+
+    async function getClassNameId(className) {
+      if (!className) return null;
+      if (_classNameIdByName[className] != null) return _classNameIdByName[className];
+      if (_classNameIdPromises[className]) return _classNameIdPromises[className];
+
+      _classNameIdPromises[className] = promisifyService('/classname/fetch-class-name', { value: className })
+        .then(r => {
+          _classNameIdByName[className] = r?.classNameId ?? null;
+          return _classNameIdByName[className];
+        })
+        .catch(err => {
+          console.warn('[ClassNameId] fetch failed for', className, err);
+          _classNameIdByName[className] = null;
+          return null;
+        })
+        .finally(() => { delete _classNameIdPromises[className]; });
+
+      return _classNameIdPromises[className];
+    }
+
+    async function ensureObjectDefinitionsLoaded() {
+      if (_defsLoaded) return;
+      if (_defsPromise) return _defsPromise;
+
+      const companyId = Liferay.ThemeDisplay.getCompanyId();
+
+      _defsPromise = (async () => {
+        // 1) charger les defs → on a className + objectDefinitionId + ERC
+        const list = await promisifyService('/object.objectdefinition/get-object-definitions', {
+          companyId, start: -1, end: -1
+        }).catch(err => {
+          console.warn('[ObjectDefs] load failed:', err);
+          return [];
+        });
+
+        const classNames = new Set();
+        for (const d of (Array.isArray(list) ? list : [])) {
+          const erc = d?.externalReferenceCode;
+          if (!erc) continue;
+          _ercMap[erc] = {
+            erc,
+            className: d?.className || null,
+            objectDefinitionId: d?.objectDefinitionId ?? null,
+            classNameId: null // on le complètera après
+          };
+          if (d?.className) classNames.add(d.className);
+        }
+
+        // 2) pour chaque className unique → récupérer classNameId
+        await Promise.all(
+          Array.from(classNames).map((cn) => getClassNameId(cn))
+        );
+
+        // 3) compléter le map ERC avec les classNameId
+        for (const erc of Object.keys(_ercMap)) {
+          const cn = _ercMap[erc].className;
+          _ercMap[erc].classNameId = cn ? (_classNameIdByName[cn] ?? null) : null;
+        }
+
+        _defsLoaded = true;
+      })();
+
+      return _defsPromise;
+    }
+
+    // expose helpers
+    CTD.ensureObjectDefinitionsLoaded = ensureObjectDefinitionsLoaded;
+
+    CTD.getObjectDefinitionByERC = async function (erc) {
+      await ensureObjectDefinitionsLoaded();
+      return _ercMap[erc] || null;
+    };
+
+    CTD.getClassNameIdByObjectERC = async function (erc) {
+      const d = await CTD.getObjectDefinitionByERC(erc);
+      return d?.classNameId ?? null;
+    };
+
+    CTD.getClassNameByObjectERC = async function (erc) {
+      const d = await CTD.getObjectDefinitionByERC(erc);
+      return d?.className ?? null;
+    };
+
+    CTD.getObjectDefinitionIdByERC = async function (erc) {
+      const d = await CTD.getObjectDefinitionByERC(erc);
+      return d?.objectDefinitionId ?? null;
+    };
+
+    // générique : className -> classNameId (hors ObjectDefinition)
+    CTD.getClassNameId = getClassNameId;
+  })();
 </script>
