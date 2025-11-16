@@ -16,6 +16,11 @@ Enable it on pages where you want to use context aware Datasets.
 
 It overrides the native javascript fetch function. :)
 
+## How to trigger it?
+
+Pass the `liferaydds=true` query parameter in the request to trigger the variable
+replacement in the HTTP request.
+
 ## Supported values
 
 The following values are read from the ThemeDisplay javascript object.
@@ -71,3 +76,17 @@ In the long term, Liferay shall provide such capabilities out of the box.
 Keep an eye on:
 
 https://liferay.atlassian.net/browse/LPD-54499
+
+# Usage
+
+This Data Set hack can be used together with:
+
+ - A client extension to render Data Set elements in a graph
+   https://github.com/fabian-bouche-liferay/dataset-graph
+
+ - A client extension to render Data Set elements on a geographic map
+   https://github.com/fabian-bouche-liferay/openstreetmap-client-extension
+
+ - A client extension to render Data Set elements in a calendar
+   https://github.com/fabian-bouche-liferay/calendar-cx
+
