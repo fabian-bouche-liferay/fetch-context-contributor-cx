@@ -77,6 +77,10 @@ Keep an eye on:
 
 https://liferay.atlassian.net/browse/LPD-54499
 
+2026-01-14 Update:
+
+https://liferay.atlassian.net/browse/LPD-54155
+
 # Usage
 
 This Data Set hack can be used together with:
