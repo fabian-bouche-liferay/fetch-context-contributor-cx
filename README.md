@@ -58,14 +58,14 @@ Some examples will make it easier to explain:
  - `{now}` is now
  - `{today}` is today (midnight), in your local timezone
  - `{today +gmtoffsethours}` is today, GMT
- - `{now -1d}` is 24 hours ago
- - `{now -1h}` is 1 hour ago
- - `{now -30m}` is 30 minutes ago
- - `{now +1d}` is in 24 hours from now
- - `{now +2h}` is in 2 hours from now
- - `{now +20m}` is in 20 minutes from now
- - `{today +1d}` means tomorrow
- - `{today -1d}` means all my troubles seemed so far away
+ - `{now-1d}` is 24 hours ago
+ - `{now-1h}` is 1 hour ago
+ - `{now-30m}` is 30 minutes ago
+ - `{now+1d}` is in 24 hours from now
+ - `{now+2h}` is in 2 hours from now
+ - `{now+20m}` is in 20 minutes from now
+ - `{today+1d}` means tomorrow
+ - `{today-1d}` means all my troubles seemed so far away
 
 # Long term solution
 
